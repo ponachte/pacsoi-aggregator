@@ -1,7 +1,6 @@
-async function main() {
-    const fetch = require('node-fetch');
-    const { URL } = require('url');
+import { URL } from 'url';
 
+async function main() {
     const pipelineEndpoint = 'http://localhost:5000/config/actors';
     const pipelineUrl = new URL(pipelineEndpoint);
 

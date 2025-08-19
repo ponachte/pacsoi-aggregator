@@ -2,15 +2,27 @@ package proxy
 
 import (
 	"fmt"
+	"log"
+
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
-	"log"
 )
 
+// isPodRunning checks whether a pod with the label "app=uma-proxy" is currently running
+// in the "default" namespace of the Kubernetes cluster.
+//
+// Parameters:
+//
+//	clientset - a Kubernetes Clientset used to interact with the cluster.
+//
+// Returns:
+//
+//	(bool, error) - true if at least one matching pod is in the Running phase,
+//	                false otherwise. Returns an error if the pod listing fails.
 func isPodRunning(clientset *kubernetes.Clientset) (bool, error) {
 	pods, err := clientset.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("app=%s", "uma-proxy"),
@@ -28,6 +40,18 @@ func isPodRunning(clientset *kubernetes.Clientset) (bool, error) {
 	return false, nil
 }
 
+// createPod creates a Kubernetes pod named "uma-proxy" in the "default" namespace.
+// The pod runs a container using the "uma-proxy" image, exposing ports 8080 and 8443.
+// It mounts a Kubernetes secret named "uma-proxy-key-pair" as a volume at /key-pair,
+// and sets environment variables to reference the certificate and key files.
+//
+// Parameters:
+//
+//	clientset - a Kubernetes Clientset used to interact with the cluster.
+//
+// Returns:
+//
+//	error - nil if the pod is created successfully, or an error if creation fails
 func createPod(clientset *kubernetes.Clientset) error {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,6 +108,17 @@ func createPod(clientset *kubernetes.Clientset) error {
 	return nil
 }
 
+// serviceExists checks whether a Kubernetes Service named "uma-proxy-service"
+// exists in the "default" namespace.
+//
+// Parameters:
+//
+//	clientset - a Kubernetes Clientset used to interact with the cluster.
+//
+// Returns:
+//
+//	(bool, error) - true if the service exists, false if not found.
+//	                Returns an error if the check fails for other reasons.
 func serviceExists(clientset *kubernetes.Clientset) (bool, error) {
 	_, err := clientset.CoreV1().Services("default").Get(context.Background(), "uma-proxy-service", metav1.GetOptions{})
 	if err != nil {
@@ -126,6 +161,17 @@ func createService(clientset *kubernetes.Clientset) error {
 	return nil
 }
 
+// SetupProxy ensures that the UMA proxy pod and its corresponding service are running in the Kubernetes cluster.
+// If the "uma-proxy" pod is not running, it creates the pod and waits for it to reach the Running phase.
+// If the "uma-proxy-service" service does not exist, it creates the service.
+//
+// Parameters:
+//
+//	clientset - a Kubernetes Clientset used to interact with the cluster.
+//
+// Behavior:
+//   - Panics if pod creation fails or if the pod enters the Failed phase during startup.
+//   - Panics if service creation fails.
 func SetupProxy(clientset *kubernetes.Clientset) {
 	if running, err := isPodRunning(clientset); err != nil || !running {
 		err := createPod(clientset)
@@ -152,5 +198,4 @@ func SetupProxy(clientset *kubernetes.Clientset) {
 			panic(err)
 		}
 	}
-
 }

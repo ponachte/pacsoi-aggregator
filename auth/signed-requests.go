@@ -32,12 +32,12 @@ var (
 
 // Jwk represents a single JSON Web Key in a JWKS.
 type Jwk struct {
-	Kty string `json:"kty"`
-	Kid string `json:"kid"`
-	Use string `json:"use"`
-	Alg string `json:"alg"`
-	N   string `json:"n"` // Modulus (base64url)
-	E   string `json:"e"` // Exponent (base64url)
+	Kty string `json:"kty"` // Key type (e.g., "RSA")
+	Kid string `json:"kid"` // Key ID
+	Use string `json:"use"` // Intended use ("sig" for signature)
+	Alg string `json:"alg"` // Algorithm (e.g., "RS256")
+	N   string `json:"n"`   // Modulus (base64url)
+	E   string `json:"e"`   // Exponent (base64url)
 }
 
 // Jwks is a JSON Web Key Set.
@@ -45,6 +45,8 @@ type Jwks struct {
 	Keys []Jwk `json:"keys"`
 }
 
+// InitSigning initializes the RSA key, JWKS, and sets up the JWKS HTTP endpoint.
+// It should be called at startup to prepare signing and key discovery.
 func InitSigning(mux *http.ServeMux) {
 	// 1) Load our RSA private key from file (PEM).
 	setPrivateKey("private_key.pem")
@@ -65,6 +67,8 @@ func InitSigning(mux *http.ServeMux) {
 	})
 }
 
+// setPrivateKey loads an RSA private key from a file, or generates and saves a new one if not found.
+// The key is stored in PEM format.
 func setPrivateKey(keyFilePath string) {
 	if rsaPrivateKey != nil {
 		return
@@ -115,11 +119,11 @@ func setPrivateKey(keyFilePath string) {
 		fmt.Println("Error writing RSA key to file: ", err)
 		return
 	}
-	return
 }
 
 // makeJWKFromRSAPrivateKey produces a Jwk containing the public portion
 // (n, e) for the given RSA key, along with a provided kid.
+// Returns a Jwk struct suitable for JWKS.
 func makeJWKFromRSAPrivateKey(kid string) (Jwk, error) {
 	pub := rsaPrivateKey.Public().(*rsa.PublicKey)
 	// Convert modulus (N) and exponent (E) to base64url
@@ -142,6 +146,9 @@ func makeJWKFromRSAPrivateKey(kid string) (Jwk, error) {
 	return jwk, nil
 }
 
+// doSignedRequest signs an outgoing HTTP request using the RSA private key.
+// It adds HTTP Signature headers and sends the request.
+// Returns the HTTP response or error.
 func doSignedRequest(req *http.Request) (*http.Response, error) {
 	// 1) Put your domain in the Authorization header as cred="..."
 	//    The Node server uses that to fetch your JWK from JWKS
@@ -149,6 +156,7 @@ func doSignedRequest(req *http.Request) (*http.Response, error) {
 
 	label := "sig1"
 
+	// Read request body for digest
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read body of outgoing request: %w", err)
@@ -157,9 +165,11 @@ func doSignedRequest(req *http.Request) (*http.Response, error) {
 	digestVal := "sha-256=" + base64.StdEncoding.EncodeToString(h[:])
 	req.Header.Set("Content-Digest", digestVal)
 
+	// Add Date header
 	dateVal := time.Now().UTC().Format(http.TimeFormat)
 	req.Header.Set("Date", dateVal)
 
+	// Prepare Signature-Input header
 	created := time.Now().Unix()
 	signatureInputValue := fmt.Sprintf(
 		`%s=("content-digest" "date");keyid=%q;alg=%q;created=%d`,
@@ -167,6 +177,7 @@ func doSignedRequest(req *http.Request) (*http.Response, error) {
 	)
 	req.Header.Set("Signature-Input", signatureInputValue)
 
+	// Canonicalize headers for signing
 	canonical := fmt.Sprintf(
 		"\"content-digest\": %s\n\"date\": %s\n\"@signature-params\": (\"content-digest\" \"date\");keyid=%q;alg=%q;created=%d",
 		digestVal,
@@ -176,17 +187,20 @@ func doSignedRequest(req *http.Request) (*http.Response, error) {
 		created,
 	)
 
+	// Hash canonical string and sign it
 	hash := sha256.Sum256([]byte(canonical))
 	sigBytes, err := rsa.SignPKCS1v15(rand.Reader, rsaPrivateKey, crypto.SHA256, hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
 
+	// Encode signature and add to header
 	sigB64 := base64.StdEncoding.EncodeToString(sigBytes)
 	signatureValue := fmt.Sprintf(`%s=:%s:`, label, sigB64)
 
 	req.Header.Set("Signature", signatureValue)
 
+	// Send the signed request
 	client := &http.Client{}
 	return client.Do(req)
 }
