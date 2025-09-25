@@ -73,8 +73,11 @@ ex:permission2 a odrl:Permission ;
 ```
 
 ## Run the Aggregator
-To deploy the aggregator into the minikube server first update the `k8s/aggregator.yaml` deployment file.
-Add the kubernetes cluster IP and the UMA server IP as environment variables
+First configure the aggregator by updating `k8s/aggregator-config.yaml`. 
+- The aggregator_external_host will be automatically set during `make minikube-deploy` with the $MINIKUBE_IP env var
+- If `as_issuer` is not set, UMA Authorization for the aggregator is disabled
+
+Deploy the aggregator to the cluster
 ```bash
 make minikube-deploy
 ```
@@ -97,7 +100,11 @@ Stop the port forwarding with:
 make stop-aggregator
 ```
 
+## Other Cluster
+If you run your own kubernetes cluster, use the `.yaml` files to set up the aggregator on your cluster.
+
 ### Demo
 An easy way to test the aggregator is by running `node client-test/create-actor.js` to create an actor.
 Do make sure the uma server is running before you do this, and that it has the correct policies so you can access the correct endpoints.
-After that, you can run `node client-test/get-actor.js` to retrieve the info on the actor you just created and its results.
+After that, you can run `node client-test/get-actors.js` to retrieve the info on the actor you just created.
+Get the results by running `node client-test/get-actor.js`.
