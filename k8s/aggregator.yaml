@@ -76,14 +76,21 @@ spec:
             # External configuration
             # ------------------------
             - name: AGGREGATOR_EXTERNAL_HOST
-              value: "$MINIKUBE-IP" # Replace with actual Minikube IP or external hostname
+              valueFrom:
+                configMapKeyRef:
+                  name: aggregator-config
+                  key: aggregator_external_host
             - name: AGGREGATOR_EXTERNAL_PORT
               value: "30500"        # NodePort exposed externally
             # ------------------------
             # Authorization configuration
             # ------------------------
             - name: AS_ISSUER
-              value: "$UMA-IP" # Replace with actual Authorization Server
+              valueFrom:
+                configMapKeyRef:
+                  name: aggregator-config
+                  key: as_issuer
+                  optional: true
             # ------------------------
             # Transformation configuration
             # ------------------------

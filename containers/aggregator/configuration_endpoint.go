@@ -2,6 +2,7 @@ package main
 
 import (
 	"aggregator/auth"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,20 +137,37 @@ func (data ConfigurationData) getActors(response http.ResponseWriter, _ *http.Re
 // What if the transformation takes to long to execute => return 202 but then when the user tries to get the results, we return 404 with extra information that the transformation is still running/canceled?
 func (data ConfigurationData) createActor(response http.ResponseWriter, request *http.Request) {
 	// 2) get transformation and sources from request body
-	pipelineDescription, err := io.ReadAll(request.Body)
+	defer request.Body.Close()
+
+	// Read the request body
+	bodyBytes, err := io.ReadAll(request.Body)
 	if err != nil {
 		println(err.Error())
 		http.Error(response, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-	defer request.Body.Close()
-	fmt.Printf("Transformation: %v\n", string(pipelineDescription))
 
-	actor, err := createActor(string(pipelineDescription))
+	// Define a struct matching the expected JSON
+	var payload struct {
+		Name                string `json:"name"`
+		PipelineDescription string `json:"pipelineDescription"`
+	}
 
+	// Parse JSON into the struct
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		println(err.Error())
+		http.Error(response, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("Actor Name: %v\n", payload.Name)
+	fmt.Printf("Pipeline Description: %v\n", payload.PipelineDescription)
+
+	// Call createActor with name and description
+	actor, err := createActor(payload.PipelineDescription, payload.Name)
 	if err != nil {
-		fmt.Println("Failed to create an actor: " + err.Error())
-		http.Error(response, "Failed to create the actor", http.StatusInternalServerError)
+		println(err.Error())
+		http.Error(response, "Failed to create actor", http.StatusInternalServerError)
 		return
 	}
 
@@ -161,8 +179,14 @@ func (data ConfigurationData) createActor(response http.ResponseWriter, request 
 
 	// 5) return the endpoint to the client
 	header := response.Header()
-	header.Set("Content-Type", "test/plain")
-	_, err = response.Write([]byte(actor.marshalActor()))
+	header.Set("Content-Type", "text/plain")
+	actorBytes, err := json.Marshal(actor)
+	if err != nil {
+		println(err.Error())
+		http.Error(response, "error when marshaling actor", http.StatusInternalServerError)
+		return
+	}
+	_, err = response.Write(actorBytes)
 	if err != nil {
 		println(err.Error())
 		http.Error(response, "error when writing body", http.StatusInternalServerError)
@@ -211,7 +235,13 @@ func (data ConfigurationData) getActor(response http.ResponseWriter, request *ht
 	header := response.Header()
 	header.Set("Content-Type", "application/json")
 	header.Set("ETag", "0") // TODO: actors can't be changed, so they will always return the same value so ETag is always 0 (for now)
-	_, err := response.Write([]byte(actor.marshalActor()))
+	actorBytes, err := json.Marshal(actor)
+	if err != nil {
+		println(err.Error())
+		http.Error(response, "error when marshaling actor", http.StatusInternalServerError)
+		return
+	}
+	_, err = response.Write(actorBytes)
 	if err != nil {
 		println(err.Error())
 		http.Error(response, "error when writing body", http.StatusInternalServerError)

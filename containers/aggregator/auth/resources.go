@@ -31,6 +31,10 @@ var resourceMap = struct {
 
 // CreateResource sends a POST request and stores the resource location
 func CreateResource(name string, scopes []Scope) {
+	if !AS_DEFINED {
+		return
+	}
+
 	umaConfig, err := getUMAConfig(AS_ISSUER)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to fetch UMA config: %v", err))
@@ -95,6 +99,10 @@ func CreateResource(name string, scopes []Scope) {
 
 // DeleteResource deletes a resource by name
 func DeleteResource(name string) {
+	if !AS_DEFINED {
+		return
+	}
+
 	resourceMap.RLock()
 	deleteURL, exists := resourceMap.data[name]
 	resourceMap.RUnlock()
@@ -135,6 +143,10 @@ func DeleteResource(name string) {
 
 // DeleteAllResources deletes all resources tracked in the local resourceMap
 func DeleteAllResources() {
+	if !AS_DEFINED {
+		return
+	}
+
 	resourceMap.RLock()
 	names := make([]string, 0, len(resourceMap.data))
 	for name := range resourceMap.data {

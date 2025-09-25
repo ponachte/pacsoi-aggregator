@@ -20,12 +20,10 @@ import (
 
 // AS_ISSUER is read from environment variable
 var AS_ISSUER string
+var AS_DEFINED bool
 
 func init() {
-	AS_ISSUER = os.Getenv("AS_ISSUER")
-	if AS_ISSUER == "" {
-		panic("Environment variable AS_ISSUER is not set")
-	}
+	AS_ISSUER, AS_DEFINED = os.LookupEnv("AS_ISSUER")
 }
 
 type Permission struct {
@@ -40,6 +38,11 @@ type UmaClaims struct {
 }
 
 func AuthorizeRequest(response http.ResponseWriter, request *http.Request, extraPermissions []Permission) bool {
+	// ✅ If AS_ISSUER is not set, always authorize
+	if !AS_DEFINED {
+		return true
+	}
+
 	// check if Authorization header is present, if not create ticket
 	if request.Header.Get("Authorization") == "" {
 		// create ticket
@@ -102,7 +105,6 @@ func AuthorizeRequest(response http.ResponseWriter, request *http.Request, extra
 		}
 	}
 	return false
-
 }
 
 func fetchTicket(permissions map[string][]Scope, issuer string) (string, error) {

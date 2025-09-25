@@ -76,8 +76,9 @@ minikube-deploy:
 		-n uma-proxy-ns --dry-run=client -o yaml | kubectl apply -f -
 	@echo "📄 Applying resources..."
 	@export MINIKUBE_IP=$$(minikube ip); \
-	envsubst < k8s/uma-proxy.yaml | kubectl apply -f -; \
-	envsubst < k8s/aggregator.yaml | kubectl apply -f -
+	envsubst < k8s/aggregator-config.yaml | kubectl apply -f -; \
+	kubectl apply -f k8s/uma-proxy.yaml; \
+	kubectl apply -f k8s/aggregator.yaml
 	@echo "🗑️ Cleaning up generated key pair files..."
 	@rm uma-proxy.crt uma-proxy.key
 	@echo "✅ Resources deployed to Minikube"

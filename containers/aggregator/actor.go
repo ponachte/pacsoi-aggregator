@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,13 +22,14 @@ func InitializeKubernetes(mux *http.ServeMux) {
 }
 
 type Actor struct {
+	Name                string `json:"name"`
 	Id                  string `json:"id"`
 	PipelineDescription string `json:"pipelineDescription"`
 	pod                 *v1.Pod
 }
 
 // TODO This needs to be more generic and extensible
-func createActor(pipelineDescription string) (Actor, error) {
+func createActor(pipelineDescription string, name string) (Actor, error) {
 	id := uuid.New().String()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -68,25 +68,25 @@ func createActor(pipelineDescription string) (Actor, error) {
 					Ports: []v1.ContainerPort{
 						{ContainerPort: 8080},
 					},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "key-pair",
-							MountPath: "/key-pair",
-							ReadOnly:  true,
-						},
-					},
+					// VolumeMounts: []v1.VolumeMount{
+					// 	{
+					//		Name:      "key-pair",
+					//		MountPath: "/key-pair",
+					//		ReadOnly:  true,
+					//	},
+					// },
 				},
 			},
-			Volumes: []v1.Volume{
-				{
-					Name: "key-pair",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName: "uma-proxy-key-pair",
-						},
-					},
-				},
-			},
+			// Volumes: []v1.Volume{
+			//	{
+			//		Name: "key-pair",
+			//		VolumeSource: v1.VolumeSource{
+			//			Secret: &v1.SecretVolumeSource{
+			//				SecretName: "uma-proxy-key-pair",
+			//			},
+			//		},
+			//	},
+			// },
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
@@ -155,7 +155,7 @@ podLoop:
 	// 5. Register handler in aggregator
 	// -----------------------------
 	serviceURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:80", serviceName, namespace)
-	serverMux.HandleFunc("/actors/"+id, func(w http.ResponseWriter, r *http.Request) {
+	serverMux.HandleFunc("/actors/"+name, func(w http.ResponseWriter, r *http.Request) {
 		if !auth.AuthorizeRequest(w, r, nil) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -184,6 +184,7 @@ podLoop:
 	// 6. Return actor object
 	// -----------------------------
 	return Actor{
+		Name:                name,
 		Id:                  id,
 		PipelineDescription: pipelineDescription,
 		pod:                 pod,
@@ -213,16 +214,4 @@ func (actor Actor) Stop() {
 	} else {
 		fmt.Println("Service deleted successfully:", serviceName)
 	}
-}
-
-// TODO: should return the status of the actor (running, stopped, errors, ect.)
-func (actor Actor) marshalActor() string {
-	pipelineForJson := strings.ReplaceAll(actor.PipelineDescription, `"`, `\"`)
-	pipelineForJson = strings.ReplaceAll(pipelineForJson, "\n", `\n`)
-	actorJson := fmt.Sprintf(
-		`{"id":"%s","transformation":"%s"}`,
-		actor.Id,
-		pipelineForJson,
-	)
-	return actorJson
 }

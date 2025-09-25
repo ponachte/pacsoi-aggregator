@@ -1,37 +1,91 @@
 
 import { URL } from 'url';
 
+const ACTOR_NAME = 'observations';
+
 const TOKEN_URL = 'https://kvasir-auth.faqir.org/realms/quarkus/protocol/openid-connect/token';
 const CLIENT_ID = 'aggregator';
 const CLIENT_SECRET = 'SubNkF1qZ0UkPmhr67YNOSLXNxF2mtuW';
-const QUERY_ENDPOINT = 'https://kvasir.faqir.org/pol/slices/persons/query';
+const QUERY_ENDPOINT = 'https://kvasir.faqir.org/pol/slices/observations/query';
 
 const SPARQL_QUERY = `
-PREFIX ex: <http://example.org/>
-PREFIX schema: <http://schema.org/>
-SELECT ?n1 WHERE {
-  ?p1 schema:givenName ?n1 ;
-    ex:knows ?p2 .
-  ?p2 schema:givenName "Kenneth" .
-}`
+PREFIX moveUp: <http://moveUp.care/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?subj ?date (AVG(?value) AS ?avgValue)
+WHERE {
+  ?obs moveUp:subject ?subj ;
+       moveUp:valueQuantity ?valueQuantity ;
+       moveUp:effectiveDateTime ?datetimeStr .
+  ?valueQuantity moveUp:value ?value ;
+                 moveUp:unit "steps per day" .
+
+  BIND(xsd:dateTime(?datetimeStr) AS ?datetime)
+  BIND(xsd:date(?datetime) AS ?date)
+}
+GROUP BY ?subj ?date
+ORDER BY ?subj ?date
+`
 
 const SCHEMA_SOURCE = `type Query {
-  persons(cursor: String): [foaf_Person]!
-  person(id: ID!, cursor: String): foaf_Person
+  observation(id: ID!): moveUp_Observation
+  observations(cursor: String): [moveUp_Observation!]!
 }
 
-type foaf_Person {
-  id(cursor: String): ID!
-  ex_knows(id: ID, cursor: String): [foaf_Person]!
-  schema_email(cursor: String): String!
-  schema_givenName(cursor: String): String!
-}`
+type moveUp_Procedure {
+  id: ID!
+  dct_description: String!
+}
+
+type moveUp_ValueQuantitySystem {
+  moveUp_system: String!
+  moveUp_code: String!
+  moveUp_value: Float!
+  moveUp_unit: String!
+}
+
+type moveUp_ValueCodeableConcept {
+  dct_description: String!
+  moveUp_coding(id: ID, cursor: String): [moveUp_Coding!]!
+}
+
+type moveUp_Code {
+  moveUp_coding(id: ID, cursor: String): [moveUp_Coding!]!
+}
+
+type moveUp_Category {
+  moveUp_coding(id: ID, cursor: String): [moveUp_Coding!]!
+}
+
+type moveUp_Coding {
+  id: ID! 
+  moveUp_system: ID!
+  moveUp_code: String!
+  dct_description: String!
+}
+
+type moveUp_Observation {
+  id: ID!
+  moveUp_status: String!
+  moveUp_category(cursor: String): [moveUp_Category!]!
+  moveUp_code: moveUp_Code!
+  moveUp_subject: ID!
+  moveUp_effectiveDateTime: String!
+  moveUp_valueQuantity: moveUp_ValueQuantitySystem
+  moveUp_valueCodeableConcept: moveUp_ValueCodeableConcept
+  moveUp_partOf(id: ID, cursor: String): [moveUp_Procedure!]
+}
+`
 
 const SCHEMA_CONTEXT = {
   "kss": "https://kvasir.discover.ilabt.imec.be/vocab#",
-  "ex": "http://example.org/",
+  "dct": "http://purl.org/dc/terms/",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "r2r": "http://www4.wiwiss.fu-berlin.de/bizer/r2r/",
   "foaf": "http://xmlns.com/foaf/0.1/",
-  "schema": "http://schema.org/"
+  "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+  "rml": "http://w3id.org/rml/",
+  "moveUp": "http://moveUp.care/"
 };
 
 const PipelineDescription = `
@@ -62,12 +116,17 @@ async function main() {
     console.log(PipelineDescription);
     console.log('');
 
+    const body = {
+      "name": ACTOR_NAME,
+      "pipelineDescription": PipelineDescription
+    }
+
     const response = await fetch(pipelineUrl, {
         method: "POST",
         headers: {
-            "content-type": "text/turtle"
+            "content-type": "application/json"
         },
-        body: PipelineDescription,
+        body: JSON.stringify(body),
     });
 
     if (response.status !== 200) {
