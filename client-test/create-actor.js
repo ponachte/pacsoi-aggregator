@@ -4,23 +4,23 @@ import { URL } from 'url';
 const ACTOR_NAME = 'observations';
 
 const TOKEN_URL = 'https://kvasir-auth.faqir.org/realms/quarkus/protocol/openid-connect/token';
-const CLIENT_ID = 'aggregator';
-const CLIENT_SECRET = 'SubNkF1qZ0UkPmhr67YNOSLXNxF2mtuW';
-const QUERY_ENDPOINT = 'https://kvasir.faqir.org/pol/slices/observations/query';
+const CLIENT_ID = 'moveUP';
+const CLIENT_SECRET = 'B5uK0aczOEVvAg2lzeSqUIMnPUZPwufn';
+const QUERY_ENDPOINT = 'https://kvasir.faqir.org/thozbnvfdt3rylite/slices/thozbnvfdt3rylite/query';
+const USERNAME = 'thozbnvfdt3rylite';
+const PASSWORD = 'thozbnvfdt3rylite';
 
 const SPARQL_QUERY = `
 PREFIX moveUp: <http://moveUp.care/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
-SELECT ?subj ?date (AVG(?value) AS ?avgValue)
+SELECT ?subj ?date (SUM(?value) AS ?steps_per_day)
 WHERE {
   ?obs moveUp:subject ?subj ;
        moveUp:valueQuantity ?valueQuantity ;
-       moveUp:effectiveDateTime ?datetimeStr .
+       moveUp:effectiveDateTime ?datetime .
   ?valueQuantity moveUp:value ?value ;
                  moveUp:unit "steps per day" .
-
-  BIND(xsd:dateTime(?datetimeStr) AS ?datetime)
   BIND(xsd:date(?datetime) AS ?date)
 }
 GROUP BY ?subj ?date
@@ -40,7 +40,7 @@ type moveUp_Procedure {
 type moveUp_ValueQuantitySystem {
   moveUp_system: String!
   moveUp_code: String!
-  moveUp_value: Float!
+  moveUp_value: BoxedLiteral!
   moveUp_unit: String!
 }
 
@@ -69,8 +69,8 @@ type moveUp_Observation {
   moveUp_status: String!
   moveUp_category(cursor: String): [moveUp_Category!]!
   moveUp_code: moveUp_Code!
-  moveUp_subject: ID!
-  moveUp_effectiveDateTime: String!
+  moveUp_subject: RDFNode!
+  moveUp_effectiveDateTime: BoxedLiteral!
   moveUp_valueQuantity: moveUp_ValueQuantitySystem
   moveUp_valueCodeableConcept: moveUp_ValueCodeableConcept
   moveUp_partOf(id: ID, cursor: String): [moveUp_Procedure!]
@@ -100,6 +100,8 @@ const PipelineDescription = `
         config:queryString """${SPARQL_QUERY}"""^^xsd:string ;
         config:client "${CLIENT_ID}"^^xsd:string ;
         config:secret "${CLIENT_SECRET}"^^xsd:string ;
+        config:username "${USERNAME}"^^xsd:string ;
+        config:password "${PASSWORD}"^^xsd:string ;
         config:tokenUrl "${TOKEN_URL}"^^xsd:string .
     
     ex:kvasirSource a config:KvasirSource ;

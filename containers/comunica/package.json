@@ -10,7 +10,7 @@
   "license": "MIT",
   "description": "",
   "dependencies": {
-    "@comunica-graphql/query-sparql-graphql": "^4.2.6",
+    "@comunica-graphql/query-sparql-graphql": "^4.2.8",
     "n3": "^1.26.0"
   },
   "devDependencies": {

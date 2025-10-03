@@ -69,14 +69,16 @@ async function main() {
     PREFIX config: <http://localhost:5000/config#>
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     
-    SELECT ?queryString ?url ?tokenUrl ?client ?secret ?schema ?context WHERE {
+    SELECT ?queryString ?url ?tokenUrl ?client ?secret ?schema ?context ?username ?password WHERE {
       ?exe a fno:Execution ;
         fno:executes config:SPARQLEvaluation ;
         config:sources ?sources ;
         config:queryString ?queryString ;
         config:tokenUrl ?tokenUrl ;
         config:client ?client ;
-        config:secret ?secret .
+        config:secret ?secret ;
+        config:username ?username ;
+        config:password ?password .
       ?sources (rdf:rest*/rdf:first) ?source .
       ?source config:url ?url .
       OPTIONAL {
@@ -92,6 +94,8 @@ async function main() {
       let queryString: string | undefined = undefined;
       let client: string | undefined = undefined;
       let secret: string | undefined = undefined;
+      let username: string | undefined = undefined;
+      let password: string | undefined = undefined;
       let tokenUrl: string | undefined = undefined;
       let sources: [Source, ...Source[]] | undefined = undefined;
 
@@ -104,6 +108,12 @@ async function main() {
         }
         if (secret === undefined && data.get('secret').value !== undefined) {
           secret = data.get('secret').value;
+        }
+        if (username === undefined && data.get('username').value !== undefined) {
+          username = data.get('username').value;
+        }
+        if (password === undefined && data.get('password').value !== undefined) {
+          password = data.get('password').value;
         }
         if (tokenUrl === undefined && data.get('tokenUrl').value !== undefined) {
           tokenUrl = data.get('tokenUrl').value;
@@ -142,6 +152,14 @@ async function main() {
           reject(new Error('No secret found in the pipeline description.'));
           return;
         }
+        if (username === undefined) {
+          reject(new Error('No secret found in the pipeline description.'));
+          return;
+        }
+        if (password === undefined) {
+          reject(new Error('No secret found in the pipeline description.'));
+          return;
+        }
         if (tokenUrl === undefined) {
           reject(new Error('No tokenUrl found in the pipeline description.'));
           return;
@@ -156,8 +174,8 @@ async function main() {
           client,
           secret,
           tokenUrl,
-          username: client,
-          password: secret, 
+          username,
+          password, 
           sources, 
         });
       });

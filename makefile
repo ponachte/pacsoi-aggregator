@@ -106,18 +106,7 @@ minikube-clean:
 # Aggregator port-forward for WSL
 # ------------------------
 
-# Start port-forward in the background and store its PID
+# Start port-forward
 expose-aggregator:
 	@echo "🚀 Port-forwarding aggregator to localhost:5000..."
-	@(kubectl port-forward -n aggregator-ns deployment/aggregator 5000:5000 > /dev/null 2>&1 & echo $$! > .aggregator-portforward.pid)
-	@echo "✅ Aggregator available at http://localhost:5000"
-
-# Stop the background port-forward process
-close-aggregator:
-	@if [ -f .aggregator-portforward.pid ]; then \
-		echo "🛑 Stopping aggregator port-forward..."; \
-		kill $$(cat .aggregator-portforward.pid) && rm .aggregator-portforward.pid; \
-		echo "✅ Aggregator port-forward stopped"; \
-	else \
-		echo "⚠️ No running aggregator port-forward found"; \
-	fi
+	@kubectl port-forward -n aggregator-ns deployment/aggregator 5000:5000
